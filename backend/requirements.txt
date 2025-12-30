@@ -1,0 +1,39 @@
+# FastAPI and server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Database
+sqlalchemy==2.0.23
+
+# Data collection
+yfinance==0.2.28
+pandas>=2.0.0,<3.0.0
+numpy>=1.24.0,<2.0.0
+
+# Technical indicators (will be used in Phase 2)
+# pandas-ta 暫時註釋，因為與 pandas 2.x 有版本衝突
+# 第二階段時可以使用 ta-lib 或更新版本的 pandas-ta
+# pandas-ta>=0.4.0
+
+# Task scheduling (will be used in Phase 3)
+apscheduler==3.10.4
+
+# Discord (will be used in Phase 3)
+discord.py==2.3.2
+requests>=2.32.3
+
+# Notion (will be used in Phase 3)
+notion-client==2.2.1
+
+# OpenAI (for report generation)
+openai>=1.0.0
+
+# Chart generation
+matplotlib>=3.7.0
+
+# Utilities
+python-dotenv==1.0.0
+
+
