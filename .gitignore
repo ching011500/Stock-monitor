@@ -51,4 +51,11 @@ Thumbs.db
 # Project specific
 config/local.yaml
 
+# Charts (generated files)
+charts/
+*.png
+*.jpg
+*.jpeg
+*.gif
+
 
