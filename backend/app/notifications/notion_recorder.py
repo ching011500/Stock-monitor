@@ -548,6 +548,9 @@ class NotionRecorder:
                     logger.info(f"{symbol}: 圖表已生成，路徑: {chart_path}（未上傳，需要配置 GitHub 或 Imgur）")
             
             return chart_path
+        except Exception as e:
+            logger.error(f"{symbol}: 生成或上傳圖表時發生錯誤: {str(e)}", exc_info=True)
+            return None
     
     def _upload_image_to_github(self, image_path: str, symbol: str, date: str) -> Optional[str]:
         """
@@ -656,10 +659,6 @@ class NotionRecorder:
         # 如果都沒有配置，返回 None
         logger.warning(f"{symbol}: 未配置圖片上傳服務，圖表保存在: {image_path}")
         return None
-            
-        except Exception as e:
-            logger.error(f"生成 {symbol} 圖表失敗: {str(e)}", exc_info=True)
-            return None
     
     def log_event(self, event_type: str, symbol: str, message: str,
                  severity: str = "INFO", details: Optional[str] = None) -> bool:

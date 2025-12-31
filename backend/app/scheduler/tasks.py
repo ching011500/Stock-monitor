@@ -142,23 +142,48 @@ def collect_stock_data_job():
                         if ai_failed:
                             logger.warning(f"以下標的 AI 分析失敗: {ai_failed}")
                         
-                        # AI 分析完成後，檢查警報並發送通知
-                        logger.info("開始檢查警報並發送通知...")
+                        # AI 分析完成後，檢查警報、發送 Discord 通知並更新 Notion
+                        logger.info("開始檢查警報、發送 Discord 通知並更新 Notion...")
                         try:
                             alert_engine = AlertEngine()
-                            for symbol in successful_indicator_symbols:
-                                # 檢查所有類型的警報
-                                alerts = alert_engine.check_all_alerts(symbol)
+                            # 只處理成功完成 AI 分析的標的
+                            successful_ai_symbols = [symbol for symbol, success in ai_results.items() if success]
+                            
+                            for symbol in successful_ai_symbols:
+                                try:
+                                    # 檢查所有類型的警報（會自動發送 Discord 通知）
+                                    alerts = alert_engine.check_all_alerts(symbol)
+                                    
+                                    # 更新 Notion 數據
+                                    notion_success = alert_engine.update_notion_data(symbol)
+                                    if notion_success:
+                                        logger.info(f"{symbol}: Notion 數據更新成功")
+                                    else:
+                                        logger.warning(f"{symbol}: Notion 數據更新失敗")
+                                    
+                                    # 記錄觸發的警報（Discord 通知已經在 check_all_alerts 中發送）
+                                    total_alerts = sum(len(v) for v in alerts.values())
+                                    if total_alerts > 0:
+                                        logger.info(f"{symbol} 觸發 {total_alerts} 個警報: {alerts}")
+                                    else:
+                                        logger.info(f"{symbol}: AI 分析完成，Discord 通知已發送，Notion 已更新（無特殊警報）")
+                                except Exception as e:
+                                    logger.error(f"處理 {symbol} 的警報和通知時發生錯誤: {str(e)}", exc_info=True)
+                                    continue
                                 
-                                # 更新 Notion 數據
-                                alert_engine.update_notion_data(symbol)
-                                
-                                # 記錄觸發的警報
-                                total_alerts = sum(len(v) for v in alerts.values())
-                                if total_alerts > 0:
-                                    logger.info(f"{symbol} 觸發 {total_alerts} 個警報: {alerts}")
+                            logger.info(f"✅ 完成 {len(successful_ai_symbols)} 個標的的警報檢查、Discord 通知和 Notion 更新")
+                            
+                            # 總結報告
+                            logger.info("=" * 60)
+                            logger.info(f"📊 交易日數據處理完成總結 (美股日期: {us_date})")
+                            logger.info(f"  - 數據收集: {success_count}/{total_count} 成功")
+                            logger.info(f"  - 技術指標: {indicator_success_count}/{len(indicator_results)} 成功")
+                            logger.info(f"  - AI 分析: {ai_success_count}/{len(ai_results)} 成功")
+                            logger.info(f"  - Discord 通知: {len(successful_ai_symbols)} 個標的已發送")
+                            logger.info(f"  - Notion 更新: {len(successful_ai_symbols)} 個標的已更新")
+                            logger.info("=" * 60)
                         except Exception as e:
-                            logger.error(f"警報檢查失敗: {str(e)}", exc_info=True)
+                            logger.error(f"警報檢查和通知發送失敗: {str(e)}", exc_info=True)
                     else:
                         logger.warning("沒有成功計算指標的標的，跳過 AI 分析")
                 except Exception as e:

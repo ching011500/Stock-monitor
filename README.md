@@ -54,10 +54,20 @@ cp .env.example .env
 
 ### 4. 啟動應用
 
+**本地開發**：
+```bash
+cd backend
+python run.py
+```
+
+或者直接使用 uvicorn：
 ```bash
 cd backend
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+**雲端部署（推薦）**：
+使用 GitHub Actions 定時任務，完全免費，不需要服務器。請參考 [GITHUB_ACTIONS_SETUP.md](./GITHUB_ACTIONS_SETUP.md)
 
 ### 5. 訪問 API
 
@@ -99,19 +109,29 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ```
 Stock monitor/
+├── .github/
+│   └── workflows/
+│       └── daily-stock-monitor.yml  # GitHub Actions 定時任務
 ├── backend/
 │   ├── app/
-│   │   ├── api/          # API 路由
-│   │   ├── database/     # 數據庫相關
-│   │   ├── models/       # 數據模型
-│   │   ├── services/     # 業務邏輯
-│   │   ├── config.py     # 配置管理
-│   │   └── main.py       # FastAPI 主應用
-│   └── requirements.txt
-├── config/               # 配置文件
-├── data/                 # 數據存儲（自動創建）
-├── .env                  # 環境變量（需創建）
-└── README.md
+│   │   ├── api/              # API 路由
+│   │   ├── database/         # 數據庫相關
+│   │   ├── models/           # 數據模型
+│   │   ├── data_collection/  # 數據收集服務
+│   │   ├── technical_indicators/  # 技術指標計算
+│   │   ├── ai_analysis/      # AI 分析
+│   │   ├── notifications/    # 通知服務（Discord、Notion）
+│   │   ├── scheduler/        # 定時任務
+│   │   ├── config.py         # 配置管理
+│   │   └── main.py           # FastAPI 主應用
+│   ├── data/                 # 數據存儲（本地開發用）
+│   ├── manual_collect.py     # 手動執行腳本（GitHub Actions 使用）
+│   ├── cleanup_duplicates.py # 數據庫清理工具（可選）
+│   ├── run.py                # 本地開發啟動腳本
+│   └── requirements.txt      # Python 依賴
+├── .gitignore
+├── README.md                 # 本文件
+└── GITHUB_ACTIONS_SETUP.md  # GitHub Actions 設置指南
 ```
 
 ## 開發階段

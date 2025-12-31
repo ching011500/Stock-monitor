@@ -126,109 +126,128 @@ def test_discord():
 @router.post("/create-daily-report")
 def create_daily_report(db: Session = Depends(get_db)):
     """創建 Notion 每日報告頁面（包含完整技術指標和警報）"""
-    from app.notifications import AlertEngine, ReportGenerator
-    from app.config import get_monitored_symbols
-    from datetime import datetime
-    
-    alert_engine = AlertEngine()
-    report_generator = ReportGenerator()
-    symbols = get_monitored_symbols()
-    
-    # 收集所有標的的完整數據
-    stocks_data = []
-    all_prices_list = {}  # 用於計算波動率
-    
-    for symbol in symbols:
-        price = get_latest_price(db, symbol)
-        indicator = get_latest_indicator(db, symbol)
-        signal = get_latest_signal(db, symbol)
+    try:
+        from app.notifications import AlertEngine, ReportGenerator
+        from app.config import get_monitored_symbols
+        from datetime import datetime
         
-        if price:
-            # 獲取歷史價格用於計算波動率和價格變動
-            prices = get_prices_by_symbol(db, symbol, days=30)
-            all_prices_list[symbol] = [p.close for p in prices]
-            
-            # 計算價格變動（與前一個交易日比較）
-            change_percent = 0.0
-            if len(prices) >= 2:
-                previous_price = prices[-2] if len(prices) >= 2 else None
-                if previous_price:
-                    change_percent = ((price.close - previous_price.close) / previous_price.close) * 100
-            
-            # 計算波動率（20日年化）
-            volatility = None
-            if len(prices) >= 20:
-                price_list = [p.close for p in prices[-21:]]  # 需要21個數據點計算20個收益率
-                volatility = report_generator.calculate_volatility(price_list, days=20)
-            
-            # 檢測技術警報
-            alerts = report_generator.detect_technical_alerts(
-                price=price.close,
-                ma20=indicator.ma20 if indicator else None,
-                ma50=indicator.ma50 if indicator else None,
-                rsi=indicator.rsi if indicator else None,
-                volatility=volatility,
-                avg_volatility=None  # 可以後續計算整體平均波動率
-            )
-            
-            # 檢查警報引擎的警報
-            alert_result = alert_engine.check_all_alerts(symbol)
-            all_alerts = []
-            all_alerts.extend(alert_result.get("price", []))
-            all_alerts.extend(alert_result.get("indicator", []))
-            all_alerts.extend(alert_result.get("ai_signal", []))
-            
-            # 合併技術警報和引擎警報
-            if all_alerts:
-                alerts.extend([a for a in all_alerts if a not in alerts])
-            
-            stocks_data.append({
-                "symbol": symbol,
-                "price": price.close,
-                "change_percent": change_percent,
-                "ma20": indicator.ma20 if indicator else None,
-                "ma50": indicator.ma50 if indicator else None,
-                "rsi": indicator.rsi if indicator else None,
-                "volatility": volatility,
-                "alerts": alerts,
-                "ai_signal": signal.signal if signal else "HOLD",
-                "risk_level": signal.risk_level if signal else "MEDIUM",
-            })
-    
-    # 計算平均波動率（用於比較）
-    all_volatilities = [s.get("volatility") for s in stocks_data if s.get("volatility") is not None]
-    avg_volatility = sum(all_volatilities) / len(all_volatilities) if all_volatilities else None
-    
-    # 更新每個標的的平均波動率參考
-    for stock in stocks_data:
-        if stock.get("volatility") and avg_volatility:
-            # 重新檢測警報，這次包含平均波動率
-            stock["alerts"] = report_generator.detect_technical_alerts(
-                price=stock["price"],
-                ma20=stock.get("ma20"),
-                ma50=stock.get("ma50"),
-                rsi=stock.get("rsi"),
-                volatility=stock.get("volatility"),
-                avg_volatility=avg_volatility
-            )
-    
-    # 創建每日報告
-    today = datetime.now().strftime("%Y-%m-%d")
-    page_id = alert_engine.notion.create_daily_report(today, stocks_data)
-    
-    if page_id:
-        return {
-            "success": True,
-            "message": f"每日報告創建成功",
-            "date": today,
-            "page_id": page_id,
-            "stocks_count": len(stocks_data)
-        }
-    else:
+        alert_engine = AlertEngine()
+        report_generator = ReportGenerator()
+        symbols = get_monitored_symbols()
+        
+        # 收集所有標的的完整數據
+        stocks_data = []
+        all_prices_list = {}  # 用於計算波動率
+        
+        for symbol in symbols:
+            try:
+                price = get_latest_price(db, symbol)
+                indicator = get_latest_indicator(db, symbol)
+                signal = get_latest_signal(db, symbol)
+                
+                if price:
+                    # 獲取歷史價格用於計算波動率和價格變動
+                    prices = get_prices_by_symbol(db, symbol, days=30)
+                    all_prices_list[symbol] = [p.close for p in prices]
+                    
+                    # 計算價格變動（與前一個交易日比較）
+                    change_percent = 0.0
+                    if len(prices) >= 2:
+                        previous_price = prices[-2] if len(prices) >= 2 else None
+                        if previous_price:
+                            change_percent = ((price.close - previous_price.close) / previous_price.close) * 100
+                    
+                    # 計算波動率（20日年化）
+                    volatility = None
+                    if len(prices) >= 20:
+                        price_list = [p.close for p in prices[-21:]]  # 需要21個數據點計算20個收益率
+                        volatility = report_generator.calculate_volatility(price_list, days=20)
+                    
+                    # 檢測技術警報
+                    alerts = report_generator.detect_technical_alerts(
+                        price=price.close,
+                        ma20=indicator.ma20 if indicator else None,
+                        ma50=indicator.ma50 if indicator else None,
+                        rsi=indicator.rsi if indicator else None,
+                        volatility=volatility,
+                        avg_volatility=None  # 可以後續計算整體平均波動率
+                    )
+                    
+                    # 檢查警報引擎的警報
+                    alert_result = alert_engine.check_all_alerts(symbol)
+                    all_alerts = []
+                    all_alerts.extend(alert_result.get("price", []))
+                    all_alerts.extend(alert_result.get("indicator", []))
+                    all_alerts.extend(alert_result.get("ai_signal", []))
+                    
+                    # 合併技術警報和引擎警報
+                    if all_alerts:
+                        alerts.extend([a for a in all_alerts if a not in alerts])
+                    
+                    stocks_data.append({
+                        "symbol": symbol,
+                        "price": price.close,
+                        "change_percent": change_percent,
+                        "ma20": indicator.ma20 if indicator else None,
+                        "ma50": indicator.ma50 if indicator else None,
+                        "rsi": indicator.rsi if indicator else None,
+                        "volatility": volatility,
+                        "alerts": alerts,
+                        "ai_signal": signal.signal if signal else "HOLD",
+                        "risk_level": signal.risk_level if signal else "MEDIUM",
+                    })
+            except Exception as e:
+                logger.error(f"處理標的 {symbol} 時發生錯誤: {str(e)}", exc_info=True)
+                continue
+        
+        if not stocks_data:
+            return {
+                "success": False,
+                "message": "沒有可用的股票數據，請確保數據庫中有價格數據",
+                "date": datetime.now().strftime("%Y-%m-%d")
+            }
+        
+        # 計算平均波動率（用於比較）
+        all_volatilities = [s.get("volatility") for s in stocks_data if s.get("volatility") is not None]
+        avg_volatility = sum(all_volatilities) / len(all_volatilities) if all_volatilities else None
+        
+        # 更新每個標的的平均波動率參考
+        for stock in stocks_data:
+            if stock.get("volatility") and avg_volatility:
+                # 重新檢測警報，這次包含平均波動率
+                stock["alerts"] = report_generator.detect_technical_alerts(
+                    price=stock["price"],
+                    ma20=stock.get("ma20"),
+                    ma50=stock.get("ma50"),
+                    rsi=stock.get("rsi"),
+                    volatility=stock.get("volatility"),
+                    avg_volatility=avg_volatility
+                )
+        
+        # 創建每日報告
+        today = datetime.now().strftime("%Y-%m-%d")
+        page_id = alert_engine.notion.create_daily_report(today, stocks_data)
+        
+        if page_id:
+            return {
+                "success": True,
+                "message": f"每日報告創建成功",
+                "date": today,
+                "page_id": page_id,
+                "stocks_count": len(stocks_data)
+            }
+        else:
+            return {
+                "success": False,
+                "message": "每日報告創建失敗，請檢查 Notion Daily Report Page ID 是否配置正確",
+                "date": today
+            }
+    except Exception as e:
+        logger.error(f"創建每日報告時發生錯誤: {str(e)}", exc_info=True)
         return {
             "success": False,
-            "message": "每日報告創建失敗，請檢查 Notion Daily Report Page ID 是否配置正確",
-            "date": today
+            "message": f"創建每日報告失敗: {str(e)}",
+            "error": str(e)
         }
 
 

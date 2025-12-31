@@ -1,0 +1,71 @@
+name: 每日股票監控任務
+
+on:
+  # 定時觸發：台灣時間每天早上 6:00 (UTC 22:00，前一天晚上)
+  schedule:
+    # UTC 時間 22:00 (台灣時間 06:00)
+    # 週一到週五（1-5 表示週一到週五，0 是週日）
+    - cron: '0 22 * * 1-5'
+  # 手動觸發（用於測試）
+  workflow_dispatch:
+
+jobs:
+  collect-stock-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30  # 設置超時時間
+    
+    steps:
+      - name: 檢出代碼
+        uses: actions/checkout@v4
+      
+      - name: 設置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'backend/requirements.txt'
+      
+      - name: 安裝依賴
+        working-directory: ./backend
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: 執行數據收集和分析
+        working-directory: ./backend
+        env:
+          # 監控標的
+          MONITORED_SYMBOLS: ${{ secrets.MONITORED_SYMBOLS }}
+          
+          # Discord 配置
+          DISCORD_ENABLED: ${{ secrets.DISCORD_ENABLED }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          
+          # Notion 配置
+          NOTION_ENABLED: ${{ secrets.NOTION_ENABLED }}
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          NOTION_DAILY_REPORT_PAGE_ID: ${{ secrets.NOTION_DAILY_REPORT_PAGE_ID }}
+          
+          # OpenAI 配置
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          
+          # GitHub 配置（用於圖表上傳，可選）
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO_OWNER: ${{ github.repository_owner }}
+          GITHUB_REPO_NAME: ${{ github.event.repository.name }}
+          GITHUB_BRANCH: ${{ github.ref_name }}
+        run: |
+          echo "開始執行股票監控任務..."
+          python manual_collect.py
+      
+      - name: 上傳執行日誌（僅在失敗時）
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: error-logs
+          path: |
+            backend/data/*.log
+            backend/*.log
+          retention-days: 7
+
