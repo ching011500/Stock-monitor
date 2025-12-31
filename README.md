@@ -67,7 +67,14 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 **雲端部署（推薦）**：
-使用 GitHub Actions 定時任務，完全免費，不需要服務器。請參考 [GITHUB_ACTIONS_SETUP.md](./GITHUB_ACTIONS_SETUP.md)
+
+使用 **Railway.app** 部署，請參考 [RAILWAY_SETUP.md](./RAILWAY_SETUP.md)
+
+- ✅ 免費額度 $5/月（通常足夠）
+- ✅ Mac 關機也能運行
+- ✅ 設置簡單，幾分鐘完成
+- ✅ 數據持久化
+- ✅ 自動部署（連接 GitHub 後自動部署）
 
 ### 5. 訪問 API
 
@@ -109,9 +116,6 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ```
 Stock monitor/
-├── .github/
-│   └── workflows/
-│       └── daily-stock-monitor.yml  # GitHub Actions 定時任務
 ├── backend/
 │   ├── app/
 │   │   ├── api/              # API 路由
@@ -121,17 +125,19 @@ Stock monitor/
 │   │   ├── technical_indicators/  # 技術指標計算
 │   │   ├── ai_analysis/      # AI 分析
 │   │   ├── notifications/    # 通知服務（Discord、Notion）
-│   │   ├── scheduler/        # 定時任務
+│   │   ├── scheduler/        # 定時任務（APScheduler）
 │   │   ├── config.py         # 配置管理
 │   │   └── main.py           # FastAPI 主應用
-│   ├── data/                 # 數據存儲（本地開發用）
-│   ├── manual_collect.py     # 手動執行腳本（GitHub Actions 使用）
+│   ├── data/                 # 數據存儲（本地開發用，Railway 會持久化）
 │   ├── cleanup_duplicates.py # 數據庫清理工具（可選）
-│   ├── run.py                # 本地開發啟動腳本
+│   ├── manual_collect.py     # 手動執行腳本（本地測試用）
+│   ├── run.py                # 啟動腳本（Railway 使用）
 │   └── requirements.txt      # Python 依賴
+├── Procfile                  # Railway 啟動配置
+├── railway.json              # Railway 配置文件（可選）
 ├── .gitignore
 ├── README.md                 # 本文件
-└── GITHUB_ACTIONS_SETUP.md  # GitHub Actions 設置指南
+└── RAILWAY_SETUP.md         # Railway 部署指南
 ```
 
 ## 開發階段

@@ -58,4 +58,5 @@ charts/
 *.jpeg
 *.gif
 
-
+# GitHub Actions Runner (本地 runner，不應提交)
+actions-runner/

@@ -16,7 +16,18 @@ class DiscordNotifier:
     
     def __init__(self):
         self.webhook_url = settings.DISCORD_WEBHOOK_URL
-        self.enabled = settings.DISCORD_ENABLED
+        # 確保 enabled 是布爾值（處理字符串 "true"/"false"）
+        enabled_val = settings.DISCORD_ENABLED
+        if isinstance(enabled_val, str):
+            self.enabled = enabled_val.lower() in ('true', '1', 'yes', 'on')
+        else:
+            self.enabled = bool(enabled_val)
+        
+        # 輸出初始化狀態（用於調試）
+        if self.enabled:
+            logger.info(f"Discord 通知已啟用 (Webhook URL: {'已配置' if self.webhook_url else '未配置'})")
+        else:
+            logger.info("Discord 通知未啟用")
     
     def send_message(self, content: str, embed: Optional[Dict] = None) -> bool:
         """
@@ -30,12 +41,14 @@ class DiscordNotifier:
             是否成功
         """
         if not self.enabled:
-            logger.debug("Discord 通知未啟用，跳過發送")
+            logger.info("Discord 通知未啟用，跳過發送消息")
             return False
         
         if not self.webhook_url:
             logger.warning("Discord Webhook URL 未配置，無法發送通知")
             return False
+        
+        logger.info(f"正在發送 Discord 通知...")
         
         try:
             payload = {"content": content}
@@ -49,14 +62,14 @@ class DiscordNotifier:
             )
             
             if response.status_code == 204:
-                logger.debug("Discord 通知發送成功")
+                logger.info("✅ Discord 通知發送成功")
                 return True
             else:
-                logger.warning(f"Discord 通知發送失敗: {response.status_code} - {response.text}")
+                logger.error(f"❌ Discord 通知發送失敗: HTTP {response.status_code} - {response.text}")
                 return False
                 
         except Exception as e:
-            logger.error(f"發送 Discord 通知時發生錯誤: {str(e)}", exc_info=True)
+            logger.error(f"❌ 發送 Discord 通知時發生錯誤: {str(e)}", exc_info=True)
             return False
     
     def send_price_alert(self, symbol: str, current_price: float, 

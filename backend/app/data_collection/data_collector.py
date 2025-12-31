@@ -27,7 +27,7 @@ class DataCollector:
         self.symbols = settings.MONITORED_SYMBOLS.split(",")
         self.symbols = [s.strip() for s in self.symbols if s.strip()]
     
-    def fetch_stock_data(self, symbol: str, retry_count: int = 3, delay: float = 2.0) -> Optional[Dict]:
+    def fetch_stock_data(self, symbol: str, retry_count: int = 5, delay: float = 5.0) -> Optional[Dict]:
         """
         獲取單個股票的當前數據（帶重試機制）
         
@@ -42,9 +42,10 @@ class DataCollector:
         for attempt in range(retry_count):
             try:
                 if attempt > 0:
-                    # 重試前等待，避免 429 錯誤
-                    wait_time = delay * (attempt + 1)  # 遞增延遲
-                    logger.info(f"等待 {wait_time:.1f} 秒後重試 {symbol} (嘗試 {attempt + 1}/{retry_count})...")
+                    # 重試前等待，避免 429 錯誤（使用指數退避）
+                    wait_time = delay * (2 ** (attempt - 1))  # 指數退避：5, 10, 20, 40 秒
+                    logger.info(f"⚠️ 檢測到錯誤，等待 {wait_time:.1f} 秒後重試 {symbol} (嘗試 {attempt + 1}/{retry_count})...")
+                    logger.info(f"   這可能是 Yahoo Finance 的 rate limiting，請耐心等待...")
                     time.sleep(wait_time)
                 
                 logger.info(f"開始獲取 {symbol} 的數據... (嘗試 {attempt + 1}/{retry_count})")
@@ -158,7 +159,14 @@ class DataCollector:
             except Exception as e:
                 if attempt == retry_count - 1:
                     # 最後一次嘗試失敗
-                    logger.error(f"所有方法都失敗，已重試 {retry_count} 次: {str(e)}")
+                    error_msg = str(e)
+                    if "Expecting value" in error_msg or "429" in error_msg or "timezone" in error_msg.lower():
+                        logger.error(f"❌ {symbol}: 所有重試都失敗（可能是 Yahoo Finance rate limiting）")
+                        logger.error(f"   錯誤: {error_msg[:200]}")
+                        logger.error(f"   💡 GitHub Actions 的 shared runner IP 經常被 Yahoo Finance 封鎖")
+                        logger.error(f"   💡 建議: 使用較長的重試間隔或考慮使用其他數據源")
+                    else:
+                        logger.error(f"❌ {symbol}: 所有方法都失敗，已重試 {retry_count} 次: {error_msg[:200]}")
                     return None
                 else:
                     # 繼續重試
@@ -172,10 +180,10 @@ class DataCollector:
         """獲取所有監控標的的數據（帶延遲以避免 429 錯誤）"""
         results = []
         for i, symbol in enumerate(self.symbols):
-            # 在每個請求之間添加延遲，避免觸發 429 錯誤
+            # 在每個請求之間添加延遲，避免觸發 429 錯誤（GitHub Actions 需要更長延遲）
             if i > 0:
-                delay = 3.0  # 3秒延遲
-                logger.debug(f"等待 {delay} 秒以避免速率限制...")
+                delay = 10.0  # 10秒延遲（GitHub Actions 的 shared runner IP 容易被 rate-limit）
+                logger.info(f"⏳ 等待 {delay} 秒以避免速率限制（GitHub Actions 環境）...")
                 time.sleep(delay)
             
             logger.info(f"正在獲取 {symbol} 的數據 ({i+1}/{len(self.symbols)})...")
