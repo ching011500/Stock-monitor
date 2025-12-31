@@ -1,0 +1,19 @@
+# Nixpacks 配置文件
+# Railway 使用 Nixpacks 自動檢測和構建 Python 項目
+
+[phases.setup]
+nixPkgs = ["python312", "pip"]
+
+[phases.install]
+cmds = [
+  "cd backend",
+  "pip install --upgrade pip",
+  "pip install -r requirements.txt"
+]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "cd backend && python run.py"
+

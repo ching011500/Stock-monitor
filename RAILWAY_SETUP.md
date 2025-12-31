@@ -67,13 +67,16 @@ NOTION_DAILY_REPORT_PAGE_ID=your_notion_page_id
 
 ### 步驟 4: 配置構建和啟動
 
-Railway 會自動檢測到 `Procfile` 和配置。
+Railway 會自動檢測到：
+- `Procfile` - 啟動命令
+- `runtime.txt` - Python 版本
+- `nixpacks.toml` - 構建配置（如果存在）
 
-如果沒有自動檢測，在項目設置中：
+**不需要手動設置構建命令**，Railway 會自動處理。
 
-- **Root Directory**: 留空（項目根目錄）
-- **Build Command**: `cd backend && pip install -r requirements.txt`
-- **Start Command**: `cd backend && python run.py`
+如果遇到構建問題，檢查：
+- `runtime.txt` 是否指定了 Python 版本（例如：`python-3.12`）
+- `Procfile` 是否正確（`web: cd backend && python run.py`）
 
 ### 步驟 5: 部署
 
