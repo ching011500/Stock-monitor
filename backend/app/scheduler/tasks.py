@@ -84,13 +84,6 @@ def collect_stock_data_job():
     # 例如：台灣時間 12/31 早上 6 點 = 美國時間 12/30 晚上，收集 12/30 的數據
     us_date = (check_date - timedelta(days=1))  # 美股日期是台灣時間的前一天
     
-    # 檢查是否在開始日期之後（使用台灣時間日期）
-    # 第一天：12/31 台灣時間早上 6 點收集 12/30 美股的數據
-    start_date = date(2025, 12, 31)  # 台灣時間的開始日期
-    if check_date < start_date:
-        logger.info(f"當前日期 {check_date} (台灣時間) 早於開始日期 {start_date}，跳過數據收集")
-        return
-    
     # 檢查美股日期是否為交易日
     if not is_trading_day(us_date):
         logger.info(f"{us_date} (美股日期) 不是交易日，跳過數據收集")
@@ -173,6 +166,110 @@ def collect_stock_data_job():
                                 
                             logger.info(f"✅ 完成 {len(successful_ai_symbols)} 個標的的警報檢查、Discord 通知和 Notion 更新")
                             
+                            # 創建 Notion 每日報告
+                            logger.info("開始創建 Notion 每日報告...")
+                            try:
+                                from app.database.database import get_db_sync
+                                from app.database.crud import get_latest_price, get_latest_indicator, get_latest_signal, get_prices_by_symbol
+                                from app.notifications.report_generator import ReportGenerator
+                                
+                                db = get_db_sync()
+                                report_generator = ReportGenerator()
+                                stocks_data = []
+                                
+                                try:
+                                    for symbol in successful_ai_symbols:
+                                        try:
+                                            price = get_latest_price(db, symbol)
+                                            indicator = get_latest_indicator(db, symbol)
+                                            signal = get_latest_signal(db, symbol)
+                                            
+                                            if price:
+                                                # 獲取歷史價格用於計算波動率和價格變動
+                                                prices = get_prices_by_symbol(db, symbol, days=30)
+                                                
+                                                # 計算價格變動（與前一個交易日比較）
+                                                change_percent = 0.0
+                                                if len(prices) >= 2:
+                                                    previous_price = prices[-2] if len(prices) >= 2 else None
+                                                    if previous_price:
+                                                        change_percent = ((price.close - previous_price.close) / previous_price.close) * 100
+                                                
+                                                # 計算波動率（20日年化）
+                                                volatility = None
+                                                if len(prices) >= 20:
+                                                    price_list = [p.close for p in prices[-21:]]
+                                                    volatility = report_generator.calculate_volatility(price_list, days=20)
+                                                
+                                                # 檢測技術警報
+                                                alerts = report_generator.detect_technical_alerts(
+                                                    price=price.close,
+                                                    ma20=indicator.ma20 if indicator else None,
+                                                    ma50=indicator.ma50 if indicator else None,
+                                                    rsi=indicator.rsi if indicator else None,
+                                                    volatility=volatility,
+                                                    avg_volatility=None
+                                                )
+                                                
+                                                # 檢查警報引擎的警報
+                                                alert_result = alert_engine.check_all_alerts(symbol)
+                                                all_alerts = []
+                                                all_alerts.extend(alert_result.get("price", []))
+                                                all_alerts.extend(alert_result.get("indicator", []))
+                                                all_alerts.extend(alert_result.get("ai_signal", []))
+                                                
+                                                # 合併技術警報和引擎警報
+                                                if all_alerts:
+                                                    alerts.extend([a for a in all_alerts if a not in alerts])
+                                                
+                                                stocks_data.append({
+                                                    "symbol": symbol,
+                                                    "price": price.close,
+                                                    "change_percent": change_percent,
+                                                    "ma20": indicator.ma20 if indicator else None,
+                                                    "ma50": indicator.ma50 if indicator else None,
+                                                    "rsi": indicator.rsi if indicator else None,
+                                                    "volatility": volatility,
+                                                    "alerts": alerts,
+                                                    "ai_signal": signal.signal if signal else "HOLD",
+                                                    "risk_level": signal.risk_level if signal else "MEDIUM",
+                                                })
+                                        except Exception as e:
+                                            logger.error(f"收集標的 {symbol} 的報告數據時發生錯誤: {str(e)}", exc_info=True)
+                                            continue
+                                    
+                                    if stocks_data:
+                                        # 計算平均波動率（用於比較）
+                                        all_volatilities = [s.get("volatility") for s in stocks_data if s.get("volatility") is not None]
+                                        avg_volatility = sum(all_volatilities) / len(all_volatilities) if all_volatilities else None
+                                        
+                                        # 更新每個標的的平均波動率參考
+                                        for stock in stocks_data:
+                                            if stock.get("volatility") and avg_volatility:
+                                                stock["alerts"] = report_generator.detect_technical_alerts(
+                                                    price=stock["price"],
+                                                    ma20=stock.get("ma20"),
+                                                    ma50=stock.get("ma50"),
+                                                    rsi=stock.get("rsi"),
+                                                    volatility=stock.get("volatility"),
+                                                    avg_volatility=avg_volatility
+                                                )
+                                        
+                                        # 創建每日報告（使用台灣時間日期）
+                                        report_date = taiwan_date.strftime("%Y-%m-%d")
+                                        page_id = alert_engine.notion.create_daily_report(report_date, stocks_data)
+                                        
+                                        if page_id:
+                                            logger.info(f"✅ Notion 每日報告創建成功 (日期: {report_date}, 頁面 ID: {page_id})")
+                                        else:
+                                            logger.warning(f"⚠️ Notion 每日報告創建失敗 (日期: {report_date})，請檢查配置")
+                                    else:
+                                        logger.warning("沒有可用的股票數據，跳過創建每日報告")
+                                finally:
+                                    db.close()
+                            except Exception as e:
+                                logger.error(f"創建 Notion 每日報告時發生錯誤: {str(e)}", exc_info=True)
+                            
                             # 總結報告
                             logger.info("=" * 60)
                             logger.info(f"📊 交易日數據處理完成總結 (美股日期: {us_date})")
@@ -181,6 +278,7 @@ def collect_stock_data_job():
                             logger.info(f"  - AI 分析: {ai_success_count}/{len(ai_results)} 成功")
                             logger.info(f"  - Discord 通知: {len(successful_ai_symbols)} 個標的已發送")
                             logger.info(f"  - Notion 更新: {len(successful_ai_symbols)} 個標的已更新")
+                            logger.info(f"  - Notion 每日報告: 已創建")
                             logger.info("=" * 60)
                         except Exception as e:
                             logger.error(f"警報檢查和通知發送失敗: {str(e)}", exc_info=True)
@@ -209,17 +307,14 @@ def setup_scheduler() -> BackgroundScheduler:
     # 設置任務：台灣時間早上 6:00 執行
     # 台灣時間 (UTC+8) 早上 6:00 = UTC 22:00 (前一天晚上)
     # 例如：台灣時間 2026/1/2 06:00 = UTC 2026/1/1 22:00
-    
-    # 設置開始日期為 2025/12/30 UTC 22:00（台灣時間 2025/12/31 06:00）
-    # 第一天：12/31 台灣時間早上 6 點收集 12/30 美股的數據
     scheduler.add_job(
         collect_stock_data_job,
         trigger=CronTrigger(
             day_of_week='mon-fri',  # 週一到週五
             hour=22,  # UTC 22:00 = 台灣時間 06:00 (第二天早上)
             minute=0,
-            timezone='UTC',
-            start_date=datetime(2025, 12, 30, 22, 0, 0)  # 從 2025/12/30 UTC 22:00 開始（台灣時間 2025/12/31 06:00）
+            timezone='UTC'
+            # 不設置 start_date，讓任務立即開始運行（根據 day_of_week 和 hour 自動計算下次執行時間）
         ),
         id='collect_stocks_daily',
         name='收集股票數據（台灣時間早上 6:00）',
@@ -227,9 +322,10 @@ def setup_scheduler() -> BackgroundScheduler:
     )
     
     logger.info("定時任務已設置：")
-    logger.info("  - 執行時間：每天 UTC 22:00 (台灣時間 06:00)")
-    logger.info("  - 開始日期：2025/12/30 UTC 22:00 (台灣時間 2025/12/31 06:00)")
-    logger.info("  - 第一天：12/31 台灣時間早上 6 點收集 12/30 美股的數據")
+    logger.info("  - 執行時間：每個工作日 UTC 22:00 (台灣時間 06:00)")
     logger.info("  - 自動跳過週末和節假日")
+    
+    # 顯示下次執行時間（需要先啟動調度器才能計算）
+    # 注意：這裡不顯示，因為調度器還沒啟動，會在 main.py 啟動後顯示
     
     return scheduler

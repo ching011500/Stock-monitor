@@ -297,9 +297,6 @@ class ReportGenerator:
             risk = stock.get("risk_level", "MEDIUM")
             
             lines.append(f"#### {symbol}")
-            lines.append("【技術圖】")
-            lines.append("（此處對應一張價格 + MA + RSI 圖）")
-            lines.append("")
             lines.append("【文字解讀】")
             
             # 價格表現

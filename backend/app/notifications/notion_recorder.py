@@ -43,8 +43,8 @@ class NotionRecorder:
         
         # 初始化報告生成器
         self.report_generator = ReportGenerator()
-        # 初始化圖表生成器
-        self.chart_generator = ChartGenerator()
+        # 圖表生成器已禁用（不再生成圖表）
+        # self.chart_generator = ChartGenerator()
     
     def _get_title_property_name(self, database_id: str) -> Optional[str]:
         """
@@ -359,34 +359,13 @@ class NotionRecorder:
                         }
                     })
                 elif line == "【技術圖】" or line.startswith("【技術圖】"):
-                    # 生成並上傳圖表
-                    if current_symbol:
-                        chart_path = self._generate_and_upload_chart(current_symbol, stocks_data, page_id=None)
-                        if chart_path:
-                            # 圖表會在創建頁面後上傳，這裡先標記
-                            content_blocks.append({
-                                "object": "block",
-                                "type": "paragraph",
-                                "paragraph": {
-                                    "rich_text": [{"type": "text", "text": {"content": "【技術圖】（圖表已生成）"}}]
-                                }
-                            })
-                        else:
-                            content_blocks.append({
-                                "object": "block",
-                                "type": "paragraph",
-                                "paragraph": {
-                                    "rich_text": [{"type": "text", "text": {"content": "【技術圖】（圖表生成失敗）"}}]
-                                }
-                            })
-                    else:
-                        content_blocks.append({
-                            "object": "block",
-                            "type": "paragraph",
-                            "paragraph": {
-                                "rich_text": [{"type": "text", "text": {"content": line}}]
-                            }
-                        })
+                    # 跳過技術圖標記，不插入圖表
+                    logger.debug(f"跳過技術圖標記: {line}")
+                    continue
+                elif line == "（此處對應一張價格 + MA + RSI 圖）" or "此處對應一張" in line:
+                    # 跳過占位符文本，不添加到內容塊中
+                    logger.debug(f"跳過占位符文本: {line}")
+                    continue
                 else:
                     content_blocks.append({
                         "object": "block",
@@ -415,13 +394,6 @@ class NotionRecorder:
             )
             
             page_id = new_page["id"]
-            
-            # 為每個標的生成圖表並上傳到 Notion
-            # 在「個股分析」區塊中，為每個標的追加圖表
-            for stock in stocks_data:
-                symbol = stock.get("symbol", "")
-                # 生成圖表並上傳（會在函數內部添加到 Notion 頁面）
-                self._generate_and_upload_chart(symbol, stocks_data, page_id, date)
             
             # 添加個股詳細數據（以列表形式，因為表格在 Notion API 中較複雜）
             if stocks_data:
@@ -472,6 +444,57 @@ class NotionRecorder:
             
         except Exception as e:
             logger.error(f"創建 Notion 日報失敗: {str(e)}", exc_info=True)
+            return None
+    
+    def _generate_chart_only(self, symbol: str, date: Optional[str] = None) -> Optional[str]:
+        """
+        僅生成圖表，不進行上傳（已禁用）
+        
+        Args:
+            symbol: 股票代號
+            date: 日期（可選）
+        
+        Returns:
+            None（圖表功能已禁用）
+        """
+        logger.debug(f"{symbol}: 圖表生成已禁用，跳過生成")
+        return None
+        # 以下代碼已禁用
+        try:
+            # 從數據庫獲取歷史價格和指標數據
+            db = get_db_sync()
+            try:
+                prices = get_prices_by_symbol(db, symbol, days=60)  # 獲取60天數據用於繪圖
+                indicators = get_indicators_by_symbol(db, symbol, days=60)
+            finally:
+                db.close()
+            
+            if not prices or len(prices) < 2:
+                logger.warning(f"{symbol}: 價格數據不足，無法生成圖表")
+                return None
+            
+            # 提取 RSI 值
+            rsi_values = None
+            if indicators:
+                # 將 indicators 按時間戳匹配到 prices
+                indicator_dict = {ind.timestamp.date(): ind.rsi for ind in indicators if ind.rsi is not None}
+                rsi_values = [indicator_dict.get(p.timestamp.date()) for p in prices]
+                # 如果某些日期沒有 RSI，用 None 填充
+                rsi_values = [rsi if rsi is not None else None for rsi in rsi_values]
+            
+            # 圖表生成已禁用
+            return None
+            # 以下代碼已禁用
+            # chart_path = self.chart_generator.generate_stock_chart(
+            #     symbol=symbol,
+            #     prices=prices,
+            #     ma20=None,  # 會在圖表中計算
+            #     ma50=None,  # 會在圖表中計算
+            #     rsi_values=rsi_values
+            # )
+            # return chart_path
+        except Exception as e:
+            logger.error(f"生成 {symbol} 圖表失敗: {str(e)}", exc_info=True)
             return None
     
     def _generate_and_upload_chart(self, symbol: str, stocks_data: List[Dict], 
@@ -554,6 +577,11 @@ class NotionRecorder:
     
     def _upload_image_to_github(self, image_path: str, symbol: str, date: str) -> Optional[str]:
         """
+        上傳圖片到 GitHub（已禁用，不再上傳圖表）
+        """
+        logger.debug(f"{symbol}: 圖表上傳已禁用，跳過 GitHub 上傳")
+        return None
+        """
         上傳圖片到 GitHub repo 並返回公開 URL
         
         Args:
@@ -622,7 +650,7 @@ class NotionRecorder:
     
     def _upload_image_to_notion(self, image_path: str, symbol: str, date: str) -> Optional[str]:
         """
-        上傳圖片並返回公開 URL
+        上傳圖片並返回公開 URL（已禁用，不再上傳圖表）
         
         Args:
             image_path: 圖片文件路徑
@@ -630,34 +658,9 @@ class NotionRecorder:
             date: 日期
         
         Returns:
-            圖片的公開 URL，如果失敗則返回 None
+            None（圖表功能已禁用）
         """
-        # 優先使用 GitHub
-        github_url = self._upload_image_to_github(image_path, symbol, date)
-        if github_url:
-            return github_url
-        
-        # 備選方案：使用 Imgur（如果配置了）
-        imgur_client_id = os.getenv('IMGUR_CLIENT_ID')
-        if imgur_client_id:
-            try:
-                with open(image_path, 'rb') as f:
-                    response = requests.post(
-                        'https://api.imgur.com/3/image',
-                        headers={'Authorization': f'Client-ID {imgur_client_id}'},
-                        files={'image': f}
-                    )
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data.get('success'):
-                            image_url = data['data']['link']
-                            logger.info(f"{symbol}: 圖片已上傳到 Imgur: {image_url}")
-                            return image_url
-            except Exception as e:
-                logger.warning(f"Imgur 上傳失敗: {str(e)}")
-        
-        # 如果都沒有配置，返回 None
-        logger.warning(f"{symbol}: 未配置圖片上傳服務，圖表保存在: {image_path}")
+        logger.debug(f"{symbol}: 圖表上傳已禁用，跳過圖片上傳")
         return None
     
     def log_event(self, event_type: str, symbol: str, message: str,
