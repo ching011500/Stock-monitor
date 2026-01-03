@@ -359,6 +359,22 @@ class NotionRecorder:
                     logger.debug(f"跳過占位符文本: {line}")
                     continue
                 else:
+                    # 檢查是否包含圖片 URL 或 Markdown 圖片語法，如果有則跳過
+                    # 更嚴格的過濾：只要包含圖片相關關鍵詞或 URL 就跳過
+                    line_lower = line.lower()
+                    has_image_keyword = any(keyword in line_lower for keyword in [
+                        'chart', '圖表', '圖', 'image', '圖片', 'photo', '照片'
+                    ])
+                    has_url = any(url_pattern in line_lower for url_pattern in [
+                        'http://', 'https://', '.png', '.jpg', '.jpeg', '.gif', 
+                        'raw.githubusercontent.com', 'github.com', 'imgur.com',
+                        '![', ']('
+                    ])
+                    
+                    if has_image_keyword or has_url:
+                        logger.debug(f"跳過包含圖片相關內容的行: {line[:50]}...")
+                        continue
+                    
                     content_blocks.append({
                         "object": "block",
                         "type": "paragraph",
