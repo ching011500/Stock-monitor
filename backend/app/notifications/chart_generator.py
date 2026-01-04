@@ -239,3 +239,4 @@ class ChartGenerator:
             plt.close('all')
             return None
 
+

@@ -6,3 +6,4 @@ from app.technical_indicators.indicator_calculator import IndicatorCalculator
 
 __all__ = ['IndicatorCalculator']
 
+

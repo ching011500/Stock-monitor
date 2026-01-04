@@ -92,3 +92,4 @@ class AISignal(Base):
         return f"<AISignal(symbol={self.symbol}, signal={self.signal}, confidence={self.confidence})>"
 
 
+

@@ -88,3 +88,4 @@ def analyze_all_stocks(db: Session = Depends(get_db)):
         "failed": failed
     }
 
+

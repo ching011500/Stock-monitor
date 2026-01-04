@@ -6,3 +6,4 @@ from app.data_collection.data_collector import DataCollector
 
 __all__ = ['DataCollector']
 
+
